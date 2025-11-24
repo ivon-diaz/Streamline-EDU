@@ -1,0 +1,208 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+from datetime import date
+
+#Data Classes
+
+class Student:
+    def __init__(self, student_id, name):
+        self.student_id = student_id
+        self.name = name
+
+
+class AttendanceRecord:
+    def __init__(self, student_id, date, present: bool):
+        self.student_id = student_id
+        self.date = date
+        self.present = present
+
+
+#Attendance Page UI
+
+class AttendancePage(tk.Frame):
+    def __init__(self, root):
+        super().__init__(root, bg="#f5f5f5")
+        self.root = root
+        self.root.title("Attendance")
+        self.root.geometry("600x700")
+        self.root.configure(bg="#f5f5f5")
+
+        # Sample students (could come from your app's data later)
+        self.students = [
+            Student(1, "Jordan Rashid"),
+            Student(2, "Ivon Diaz"),
+            Student(3, "Hadi Khan"),
+        ]
+
+        # To track Present/Absent choices
+        self.attVars: dict[str, tk.StringVar] = {}
+
+        #Top Bar / Back Button
+        top_bar = tk.Frame(self, bg="#f5f5f5")
+        top_bar.pack(fill="x", pady=(10, 0))
+
+        backButton = tk.Button(
+            top_bar,
+            text="← Back",
+            font=("Arial", 12),
+            relief="flat",
+            bg="#f5f5f5",
+            fg="#063563",
+            cursor="hand2",
+            command=self.on_back
+        )
+        backButton.pack(side="left", padx=10)
+
+        #Page Title
+        gradeLevel = "K-4"  # placeholder grade level
+
+        pageTitle = tk.Label(
+            self,
+            text=f"Attendance - Grade {gradeLevel}",
+            font=("Arial", 20, "bold"),
+            bg="#063563",
+            fg="white",
+            pady=10
+        )
+        pageTitle.pack(fill="x", pady=(5, 0))
+
+        # Date Display
+        attFullDate = date.today()
+
+        weekday_index = attFullDate.weekday()
+        if weekday_index < 5:
+            weekday_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+            attWeekday = weekday_names[weekday_index]
+        else:
+            attWeekday = "Weekend"
+
+        attMonth = attFullDate.month
+        attDay = attFullDate.day
+        attYear = attFullDate.year
+
+        dateLabel = tk.Label(
+            self,
+            text=f"{attWeekday}, {attMonth} {attDay}, {attYear}",
+            font=("Arial", 12, "bold"),
+            bg="#f5f5f5",
+            fg="#2c3e50"
+        )
+        dateLabel.pack(pady=(10, 0))
+
+        #Enrollment Count
+        enrollmentLabel = tk.Label(
+            self,
+            text=f"{len(self.students)} students enrolled",
+            font=("Arial", 10),
+            bg="#f5f5f5",
+            fg="#7f8c8d"
+        )
+        enrollmentLabel.pack(pady=(0, 10))
+
+        
+        # (helps if you later have more students)
+        canvas = tk.Canvas(self, bg="#f5f5f5", highlightthickness=0)
+        canvas.pack(side="left", fill="both", expand=True, padx=(10, 0))
+
+        scrollbar = tk.Scrollbar(self, orient="vertical", command=canvas.yview)
+        scrollbar.pack(side="right", fill="y")
+
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        self.list_frame = tk.Frame(canvas, bg="#f5f5f5")
+        canvas.create_window((0, 0), window=self.list_frame, anchor="nw")
+
+        self.list_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        # Attendance List
+        for student in self.students:
+            self._create_student_row(student)
+
+        # Submit Button
+        submitButton = tk.Button(
+            self,
+            text="Submit to District",
+            bg="#1aaf78",
+            fg="white",
+            font=("Arial", 14, "bold"),
+            padx=20,
+            pady=10,
+            relief="flat",
+            cursor="hand2",
+            command=self.submit_attendance
+        )
+        submitButton.pack(pady=20)
+
+    def _create_student_row(self, student: Student):
+        """Create a row with the student name and Present/Absent buttons."""
+        frame = tk.Frame(self.list_frame, bg="white", relief="solid", bd=1)
+        frame.pack(fill="x", pady=5)
+
+        nameLabel = tk.Label(
+            frame,
+            text=student.name,
+            font=("Arial", 12, "bold"),
+            bg="white",
+            fg="#2C3E50"
+        )
+        nameLabel.pack(side="left", padx=10, pady=5)
+
+        var = tk.StringVar(value="Present")
+        self.attVars[student.student_id] = var
+
+        presentButton = tk.Radiobutton(
+            frame,
+            text="Present",
+            variable=var,
+            value="Present",
+            bg="white",
+            fg="#27AE60",
+            font=("Arial", 10)
+        )
+        presentButton.pack(side="right", padx=5)
+
+        absentButton = tk.Radiobutton(
+            frame,
+            text="Absent",
+            variable=var,
+            value="Absent",
+            bg="white",
+            fg="#E74C3C",
+            font=("Arial", 10)
+        )
+        absentButton.pack(side="right", padx=5)
+
+    #Callbacks
+
+    def on_back(self):
+   
+        self.root.destroy()
+
+    def submit_attendance(self):
+        """Collect attendance, create AttendanceRecord objects, and show a summary."""
+        today = date.today()
+        records: list[AttendanceRecord] = []
+
+        for student in self.students:
+            status = self.attVars[student.student_id].get()
+            present_flag = (status == "Present")
+            records.append(AttendanceRecord(student.student_id, today, present_flag))
+
+        # Calculate summary
+        total = len(records)
+        present_count = sum(1 for r in records if r.present)
+        absent_count = total - present_count
+        percent_present = (present_count / total * 100) if total > 0 else 0
+
+        summary = (
+            f"Attendance recorded for {total} students.\n\n"
+            f"Present: {present_count}\n"
+            f"Absent: {absent_count}\n"
+            f"Attendance rate: {percent_present:.1f}%"
+        )
+
+        
+        messagebox.showinfo("Attendance Submitted", summary)
