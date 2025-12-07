@@ -397,10 +397,11 @@ class LessonDialog:
 
 class DashboardScreen:
     """Main dashboard screen"""
-    def __init__(self, root, switch_to_lessons_callback, switch_to_parent_comm_callback):
+    def __init__(self, root, switch_to_lessons_callback, switch_to_parent_comm_callback, switch_to_iep_callback):
         self.root = root
         self.switch_to_lessons = switch_to_lessons_callback
         self.switch_to_parent_comm = switch_to_parent_comm_callback
+        self.switch_to_iep = switch_to_iep_callback
         
         self.frame = tk.Frame(root, bg="#f5f5f5")
         
@@ -485,12 +486,15 @@ class DashboardScreen:
             click_callback=self.switch_to_parent_comm
         )
         
+        # IEP Progress Reports card (clickable)
         self.create_card(
             cards_container,
             "4. IEP Progress Reports",
             "Individual education plans",
             "#F44336",
-            0, 3
+            0, 3,
+            clickable=True,
+            click_callback=self.switch_to_iep
         )
         
         self.create_card(
@@ -1897,6 +1901,524 @@ class ParentCommunicationScreen:
         self.frame.pack_forget()
 
 
+class IEPProgressReportsScreen:
+    """IEP Progress Reports screen with student tracking"""
+    def __init__(self, root, back_callback):
+        self.root = root
+        self.back_callback = back_callback
+        
+        # Sample data for IEP students
+        self.students_data = [
+            {
+                "id": 0,
+                "name": "Marcus Johnson",
+                "review_due": "November 15, 2025",
+                "goals": [
+                    {
+                        "category": "Reading Goals",
+                        "description": "Marcus has made substantial progress on his reading fluency goal. Current reading level has improved from 2.1 to 2.5 grade equivalent. He consistently participates in small group reading activities.",
+                        "progress": 70
+                    },
+                    {
+                        "category": "Math Goals",
+                        "description": "Demonstrates understanding of basic addition and subtraction. Requires continued support with word problems and multi-step calculations.",
+                        "progress": 55
+                    }
+                ]
+            },
+            {
+                "id": 1,
+                "name": "Sarah Williams",
+                "review_due": "December 1, 2025",
+                "goals": [
+                    {
+                        "category": "Communication Goals",
+                        "description": "Shows improved verbal expression in structured settings. Continues to work on initiating conversations with peers.",
+                        "progress": 65
+                    }
+                ]
+            },
+            {
+                "id": 2,
+                "name": "David Chen",
+                "review_due": "November 20, 2025",
+                "goals": [
+                    {
+                        "category": "Behavioral Goals",
+                        "description": "Significant improvement in self-regulation strategies. Successfully uses calm-down techniques 80% of the time.",
+                        "progress": 80
+                    }
+                ]
+            }
+        ]
+        
+        self.current_student = self.students_data[0]  # Default to first student
+        
+        self.frame = tk.Frame(root, bg="#f5f5f5")
+        
+        # Header
+        header = tk.Frame(self.frame, bg="#2196F3", height=60)
+        header.pack(fill="x")
+        header.pack_propagate(False)
+        
+        # StreamlineEDU branding
+        branding_frame = tk.Frame(header, bg="#2196F3")
+        branding_frame.pack(side="left", padx=20, pady=15)
+        
+        tk.Label(
+            branding_frame,
+            text="StreamlineEDU",
+            font=("Arial", 14, "bold"),
+            bg="#2196F3",
+            fg="white"
+        ).pack(anchor="w")
+        
+        header_label = tk.Label(
+            branding_frame,
+            text="IEP Progress Reports",
+            font=("Arial", 11),
+            bg="#2196F3",
+            fg="#E3F2FD",
+            anchor="w"
+        )
+        header_label.pack(anchor="w")
+        
+        # Navigation bar
+        nav_frame = tk.Frame(self.frame, bg="#37474F", height=50)
+        nav_frame.pack(fill="x")
+        nav_frame.pack_propagate(False)
+        
+        back_btn = tk.Label(
+            nav_frame,
+            text="← Back  IEP Progress",
+            font=("Arial", 11),
+            bg="#37474F",
+            fg="white",
+            cursor="hand2"
+        )
+        back_btn.pack(side="left", padx=20, pady=10)
+        back_btn.bind("<Button-1>", lambda e: self.back_callback())
+        
+        # User initials
+        user_circle = tk.Canvas(nav_frame, width=35, height=35, bg="#37474F", highlightthickness=0)
+        user_circle.pack(side="right", padx=20)
+        user_circle.create_oval(2, 2, 33, 33, fill="#78909C", outline="")
+        user_circle.create_text(17.5, 17.5, text="IG", fill="white", font=("Arial", 10, "bold"))
+        
+        # Main content area
+        content_frame = tk.Frame(self.frame, bg="white")
+        content_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Student selector
+        selector_frame = tk.Frame(content_frame, bg="white")
+        selector_frame.pack(fill="x", pady=(0, 15))
+        
+        tk.Label(
+            selector_frame,
+            text="Select Student:",
+            font=("Arial", 11, "bold"),
+            bg="white",
+            fg="#212121"
+        ).pack(side="left", padx=(0, 10))
+        
+        self.student_var = tk.StringVar()
+        student_names = [s["name"] for s in self.students_data]
+        student_combo = ttk.Combobox(
+            selector_frame,
+            textvariable=self.student_var,
+            font=("Arial", 11),
+            state="readonly",
+            values=student_names,
+            width=30
+        )
+        student_combo.pack(side="left")
+        student_combo.set(self.current_student["name"])
+        student_combo.bind("<<ComboboxSelected>>", self.on_student_selected)
+        
+        # Scrollable content
+        canvas = tk.Canvas(content_frame, bg="white", highlightthickness=0)
+        scrollbar = tk.Scrollbar(content_frame, orient="vertical", command=canvas.yview)
+        
+        self.scrollable_frame = tk.Frame(canvas, bg="white")
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Enable mouse wheel scrolling
+        canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+        
+        # Render student content
+        self.render_student_content()
+    
+    def on_student_selected(self, event):
+        selected_name = self.student_var.get()
+        for student in self.students_data:
+            if student["name"] == selected_name:
+                self.current_student = student
+                break
+        self.render_student_content()
+    
+    def render_student_content(self):
+        # Clear existing content
+        for widget in self.scrollable_frame.winfo_children():
+            widget.destroy()
+        
+        # Student header
+        student_header = tk.Frame(self.scrollable_frame, bg="white")
+        student_header.pack(fill="x", pady=(0, 10))
+        
+        tk.Label(
+            student_header,
+            text=f"Student: {self.current_student['name']}",
+            font=("Arial", 16, "bold"),
+            bg="white",
+            fg="#212121"
+        ).pack(anchor="w")
+        
+        tk.Label(
+            student_header,
+            text=f"IEP Review Due: {self.current_student['review_due']}",
+            font=("Arial", 11),
+            bg="white",
+            fg="#757575"
+        ).pack(anchor="w", pady=(3, 0))
+        
+        # Auto-Generated Progress Summary section
+        self.create_progress_summary_section(self.scrollable_frame)
+        
+        # Action buttons
+        self.create_action_buttons(self.scrollable_frame)
+        
+        # Info banner
+        self.create_info_banner(self.scrollable_frame)
+    
+    def create_progress_summary_section(self, parent):
+        summary_container = tk.Frame(parent, bg="white", relief="solid", borderwidth=1)
+        summary_container.pack(fill="x", pady=(15, 20))
+        
+        # Header
+        summary_header = tk.Frame(summary_container, bg="white")
+        summary_header.pack(fill="x", padx=20, pady=(15, 10))
+        
+        tk.Label(
+            summary_header,
+            text="Auto-Generated Progress Summary",
+            font=("Arial", 13, "bold"),
+            bg="white",
+            fg="#212121"
+        ).pack(side="left")
+        
+        tk.Label(
+            summary_header,
+            text="AI Generated",
+            font=("Arial", 9),
+            bg="#E3F2FD",
+            fg="#2196F3",
+            padx=8,
+            pady=2
+        ).pack(side="right")
+        
+        # Goals
+        for goal in self.current_student["goals"]:
+            self.create_goal_item(summary_container, goal)
+    
+    def create_goal_item(self, parent, goal):
+        goal_frame = tk.Frame(parent, bg="white")
+        goal_frame.pack(fill="x", padx=20, pady=(0, 20))
+        
+        # Goal category
+        tk.Label(
+            goal_frame,
+            text=goal["category"],
+            font=("Arial", 12, "bold"),
+            bg="white",
+            fg="#212121",
+            anchor="w"
+        ).pack(fill="x", pady=(0, 8))
+        
+        # Goal description
+        desc_label = tk.Label(
+            goal_frame,
+            text=goal["description"],
+            font=("Arial", 10),
+            bg="white",
+            fg="#424242",
+            anchor="w",
+            justify="left",
+            wraplength=700
+        )
+        desc_label.pack(fill="x", pady=(0, 8))
+        
+        # Progress bar
+        progress_bg = tk.Canvas(goal_frame, height=10, bg="white", highlightthickness=0)
+        progress_bg.pack(fill="x", pady=(0, 3))
+        
+        max_width = 700
+        progress_width = int((goal["progress"] / 100) * max_width)
+        
+        progress_bg.create_rectangle(0, 0, max_width, 10, fill="#E0E0E0", outline="")
+        progress_bg.create_rectangle(0, 0, progress_width, 10, fill="#4CAF50", outline="")
+        
+        # Progress percentage
+        tk.Label(
+            goal_frame,
+            text=f"{goal['progress']}% of goal achieved",
+            font=("Arial", 9),
+            bg="white",
+            fg="#757575",
+            anchor="w"
+        ).pack(fill="x")
+    
+    def create_action_buttons(self, parent):
+        button_frame = tk.Frame(parent, bg="white")
+        button_frame.pack(fill="x", pady=(10, 20))
+        
+        export_btn = tk.Button(
+            button_frame,
+            text="Export Report",
+            font=("Arial", 11),
+            bg="#2196F3",
+            fg="white",
+            relief="flat",
+            cursor="hand2",
+            padx=20,
+            pady=10,
+            command=self.export_report
+        )
+        export_btn.pack(side="left", padx=(0, 10))
+        
+        notes_btn = tk.Button(
+            button_frame,
+            text="Add Notes",
+            font=("Arial", 11),
+            bg="#9E9E9E",
+            fg="white",
+            relief="flat",
+            cursor="hand2",
+            padx=20,
+            pady=10,
+            command=self.add_notes
+        )
+        notes_btn.pack(side="left", padx=(0, 10))
+        
+        history_btn = tk.Button(
+            button_frame,
+            text="View History",
+            font=("Arial", 11),
+            bg="#9E9E9E",
+            fg="white",
+            relief="flat",
+            cursor="hand2",
+            padx=20,
+            pady=10,
+            command=self.view_history
+        )
+        history_btn.pack(side="left")
+    
+    def create_info_banner(self, parent):
+        info_frame = tk.Frame(parent, bg="#FFFDE7", relief="solid", borderwidth=1)
+        info_frame.pack(fill="x")
+        
+        # Yellow vertical line
+        yellow_line = tk.Frame(info_frame, bg="#FBC02D", width=5)
+        yellow_line.pack(side="left", fill="y")
+        
+        info_content = tk.Frame(info_frame, bg="#FFFDE7")
+        info_content.pack(side="left", fill="x", expand=True, padx=15, pady=12)
+        
+        info_title = tk.Label(
+            info_content,
+            text="Automated data integration:",
+            font=("Arial", 10, "bold"),
+            bg="#FFFDE7",
+            fg="#212121",
+            anchor="w"
+        )
+        info_title.pack(fill="x")
+        
+        info_text = tk.Label(
+            info_content,
+            text="Progress reports pull from classroom assessments, attendance, and behavioral data automatically.",
+            font=("Arial", 10),
+            bg="#FFFDE7",
+            fg="#212121",
+            anchor="w",
+            wraplength=700,
+            justify="left"
+        )
+        info_text.pack(fill="x")
+    
+    def export_report(self):
+        messagebox.showinfo(
+            "Export Report",
+            f"Exporting IEP progress report for {self.current_student['name']}...\n\nReport will be saved as PDF."
+        )
+    
+    def add_notes(self):
+        NotesDialog(self.root, self.current_student)
+    
+    def view_history(self):
+        messagebox.showinfo(
+            "View History",
+            f"Viewing historical IEP reports for {self.current_student['name']}..."
+        )
+    
+    def show(self):
+        self.frame.pack(fill="both", expand=True)
+    
+    def hide(self):
+        self.frame.pack_forget()
+
+
+class NotesDialog:
+    """Dialog for adding notes to IEP reports"""
+    def __init__(self, parent, student):
+        self.student = student
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Add Notes")
+        self.dialog.geometry("600x500")
+        self.dialog.configure(bg="white")
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        
+        # Center the dialog
+        self.dialog.update_idletasks()
+        x = (self.dialog.winfo_screenwidth() // 2) - (600 // 2)
+        y = (self.dialog.winfo_screenheight() // 2) - (500 // 2)
+        self.dialog.geometry(f"600x500+{x}+{y}")
+        
+        # Header
+        header = tk.Label(
+            self.dialog,
+            text=f"Add Notes - {student['name']}",
+            font=("Arial", 16, "bold"),
+            bg="white",
+            fg="#212121"
+        )
+        header.pack(pady=20)
+        
+        # Form container
+        form_frame = tk.Frame(self.dialog, bg="white")
+        form_frame.pack(fill="both", expand=True, padx=30)
+        
+        # Note Type
+        tk.Label(
+            form_frame,
+            text="Note Type:",
+            font=("Arial", 10, "bold"),
+            bg="white",
+            fg="#212121",
+            anchor="w"
+        ).pack(fill="x", pady=(0, 5))
+        
+        self.note_type_var = tk.StringVar()
+        note_type_combo = ttk.Combobox(
+            form_frame,
+            textvariable=self.note_type_var,
+            font=("Arial", 11),
+            state="readonly",
+            values=["Progress Update", "Behavioral Observation", "Goal Modification", "Parent Meeting", "Other"]
+        )
+        note_type_combo.pack(fill="x", ipady=8, pady=(0, 15))
+        note_type_combo.set("Progress Update")
+        
+        # Date
+        tk.Label(
+            form_frame,
+            text="Date:",
+            font=("Arial", 10, "bold"),
+            bg="white",
+            fg="#212121",
+            anchor="w"
+        ).pack(fill="x", pady=(0, 5))
+        
+        self.date_entry = tk.Entry(
+            form_frame,
+            font=("Arial", 11),
+            relief="solid",
+            borderwidth=1
+        )
+        self.date_entry.pack(fill="x", ipady=8, pady=(0, 15))
+        self.date_entry.insert(0, datetime.now().strftime("%B %d, %Y"))
+        
+        # Notes
+        tk.Label(
+            form_frame,
+            text="Notes:",
+            font=("Arial", 10, "bold"),
+            bg="white",
+            fg="#212121",
+            anchor="w"
+        ).pack(fill="x", pady=(0, 5))
+        
+        # Text widget with scrollbar
+        text_container = tk.Frame(form_frame, relief="solid", borderwidth=1)
+        text_container.pack(fill="both", expand=True, pady=(0, 20))
+        
+        text_scrollbar = tk.Scrollbar(text_container)
+        text_scrollbar.pack(side="right", fill="y")
+        
+        self.notes_text = tk.Text(
+            text_container,
+            font=("Arial", 11),
+            wrap="word",
+            yscrollcommand=text_scrollbar.set
+        )
+        self.notes_text.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+        text_scrollbar.config(command=self.notes_text.yview)
+        
+        # Buttons
+        button_frame = tk.Frame(self.dialog, bg="white")
+        button_frame.pack(fill="x", padx=30, pady=(0, 20))
+        
+        cancel_btn = tk.Button(
+            button_frame,
+            text="Cancel",
+            font=("Arial", 11),
+            bg="#E0E0E0",
+            fg="#212121",
+            relief="flat",
+            cursor="hand2",
+            padx=20,
+            pady=8,
+            command=self.dialog.destroy
+        )
+        cancel_btn.pack(side="right", padx=(10, 0))
+        
+        save_btn = tk.Button(
+            button_frame,
+            text="Save Note",
+            font=("Arial", 11, "bold"),
+            bg="#2196F3",
+            fg="white",
+            relief="flat",
+            cursor="hand2",
+            padx=20,
+            pady=8,
+            command=self.save_note
+        )
+        save_btn.pack(side="right")
+    
+    def save_note(self):
+        note_type = self.note_type_var.get()
+        date = self.date_entry.get().strip()
+        notes = self.notes_text.get("1.0", "end-1c").strip()
+        
+        if not notes:
+            messagebox.showwarning("Validation Error", "Please enter notes.")
+            return
+        
+        self.dialog.destroy()
+        messagebox.showinfo("Success", f"Note saved for {self.student['name']}!")
+
+
 class ClassroomManagementApp:
     """Main application controller"""
     def __init__(self, root):
@@ -1905,9 +2427,15 @@ class ClassroomManagementApp:
         self.root.geometry("1200x700")  # Wider to fit 4 columns
         
         # Create screens
-        self.dashboard = DashboardScreen(root, self.show_lesson_planning, self.show_parent_communication)
+        self.dashboard = DashboardScreen(
+            root, 
+            self.show_lesson_planning, 
+            self.show_parent_communication,
+            self.show_iep_reports
+        )
         self.lesson_planning = LessonPlanningScreen(root, self.show_dashboard)
         self.parent_communication = ParentCommunicationScreen(root, self.show_dashboard)
+        self.iep_reports = IEPProgressReportsScreen(root, self.show_dashboard)
         
         # Show dashboard by default
         self.show_dashboard()
@@ -1915,17 +2443,26 @@ class ClassroomManagementApp:
     def show_dashboard(self):
         self.lesson_planning.hide()
         self.parent_communication.hide()
+        self.iep_reports.hide()
         self.dashboard.show()
     
     def show_lesson_planning(self):
         self.dashboard.hide()
         self.parent_communication.hide()
+        self.iep_reports.hide()
         self.lesson_planning.show()
     
     def show_parent_communication(self):
         self.dashboard.hide()
         self.lesson_planning.hide()
+        self.iep_reports.hide()
         self.parent_communication.show()
+    
+    def show_iep_reports(self):
+        self.dashboard.hide()
+        self.lesson_planning.hide()
+        self.parent_communication.hide()
+        self.iep_reports.show()
 
 
 if __name__ == "__main__":
